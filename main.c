@@ -1,59 +1,73 @@
-#include "shell.h"
+#include "main.h"
 
-int main(int argc __attribute__((unused)), char **argv)
+/**
+ * free_data - frees data structure
+ *
+ * @datash: data structure
+ * Return: no return
+ */
+void free_data(data_shell *datash)
 {
-	appData_t *appData = NULL;
-	int cLoop;
-	void (*func)(appData_t *);
+	unsigned int i;
 
-	appData = _initData(argv);
+	for (i = 0; datash->_environ[i]; i++)
+	{
+		free(datash->_environ[i]);
+	}
 
-	do {
-		signal(SIGINT, _ctrlC);
-		_prompt();
+	free(datash->_environ);
+	free(datash->pid);
+}
 
-		_getline(appData);
+/**
+ * set_data - Initialize data structure
+ *
+ * @datash: data structure
+ * @argv: argument vector
+ * Return: no return
+ */
+void set_data(data_shell *datash, char **argv)
+{
+	unsigned int i;
 
-		appData->history = _strtow(appData->buffer, COMMAND_SEPARATOR, ESCAPE_SEPARATOR);
+	datash->av = argv;
+	datash->input = NULL;
+	datash->args = NULL;
+	datash->status = 0;
+	datash->counter = 1;
 
-		if (appData->history == NULL)
-		{
-			_freeAppData(appData);
-			free(appData);
-			continue;
-		}
+	for (i = 0; environ[i]; i++)
+		;
 
-		for (cLoop = 0; appData->history[cLoop] != NULL; cLoop++)
-		{
-			appData->arguments = _strtow(appData->history[cLoop], SEPARATORS, ESCAPE_SEPARATOR);
+	datash->_environ = malloc(sizeof(char *) * (i + 1));
 
-			if (appData->arguments == NULL)
-			{
-				_freeAppData(appData);
-				_freeEnvList(appData->env);
-				appData->env = NULL;
-				free(appData);
-				appData = NULL;
-				break;
-			}
+	for (i = 0; environ[i]; i++)
+	{
+		datash->_environ[i] = _strdup(environ[i]);
+	}
 
-			appData->commandName = _strdup(appData->arguments[0]);
+	datash->_environ[i] = NULL;
+	datash->pid = aux_itoa(getpid());
+}
 
-			if (appData->commandName != NULL)
-			{
-				func = _getCustomFunction(appData->commandName);
-				if (func != NULL)
-					func(appData);
-				else
-					_execCommand(appData);
-			}
-			_freeCharDoublePointer(appData->arguments);
-			appData->arguments = NULL;
-			free(appData->commandName);
-			appData->commandName = NULL;
-		}
+/**
+ * main - Entry point
+ *
+ * @argc: argument count
+ * @argv: argument vector
+ *
+ * Return: 0 on success.
+ */
+int main(int argc, char **argv)
+{
+	data_shell datash;
+	(void) argc;
 
-		_freeAppData(appData);
-	} while (1);
-	return (EXIT_SUCCESS);
+	signal(SIGINT, get_sigint);
+	set_data(&datash, argv);
+	shell_loop(&datash);
+	free_data(&datash);
+	if (datash.status < 0)
+		return (255);
+	return (datash.status);
 }
